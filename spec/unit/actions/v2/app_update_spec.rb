@@ -320,6 +320,7 @@ module VCAP::CloudController
               expect(process.docker_username).to eq('bob')
               expect(process.docker_password).to eq('secret')
               expect(process.latest_package).not_to eq(original_package)
+              p process.package_state
               expect(process.needs_staging?).to be_truthy
             end
           end

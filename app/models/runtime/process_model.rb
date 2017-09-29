@@ -161,8 +161,72 @@ module VCAP::CloudController
     end
 
     def package_state
-      calculator = PackageStateCalculator.new(self)
-      calculator.calculate
+      cached_latest_droplet = latest_droplet
+      cached_current_droplet = current_droplet
+      cached_latest_package = latest_package
+      cached_latest_build = latest_build
+
+      if cached_latest_build
+        if cached_latest_build.failed?
+          return 'FAILED'
+        end
+      end
+
+      if cached_latest_droplet
+        if cached_latest_droplet.failed?
+          return 'FAILED'
+        end
+      end
+
+      if cached_current_droplet
+        if cached_current_droplet != cached_latest_droplet
+          return 'PENDING'
+        end
+        if cached_latest_package
+          p 0
+          if cached_current_droplet.package == cached_latest_package
+            return 'STAGED'
+          elsif cached_current_droplet.created_at < cached_latest_package.created_at
+            p cached_current_droplet.created_at 
+            p cached_latest_package.created_at
+            return 'PENDING'
+          elsif cached_current_droplet.created_at > cached_latest_package.created_at
+            return 'STAGED'
+          elsif cached_latest_package.failed?
+            return 'FAILED'
+          end
+        end
+        # if cached_latest_package == cached_latest_droplet.package
+          return 'STAGED'
+        # end
+      end
+
+      if cached_latest_package
+        if cached_latest_package.failed?
+          return 'FAILED'
+        end
+      end
+
+      p 5
+      return 'PENDING'
+
+      if latest_package.present? || cached_latest_droplet.present?
+        package_for_latest_droplet = cached_latest_package == cached_latest_droplet.try(:package)
+        package_failed_upload_value = if package_for_latest_droplet || !cached_latest_droplet.present? ||
+          cached_latest_package.present? &&
+            cached_current_droplet.try(:package) != cached_latest_package &&
+            cached_latest_package.created_at >= cached_latest_droplet.created_at
+                                        cached_latest_package.try(:state) == PackageModel::FAILED_STATE
+                                      end
+        return 'FAILED' if package_failed_upload_value || latest_build && latest_build.failed? || latest_droplet && cached_latest_droplet.failed?
+        return 'STAGED' if (cached_latest_droplet.present? || latest_build.present?) &&
+          (latest_build.nil? || latest_build.staged?) &&
+          latest_droplet == cached_current_droplet && !(!cached_latest_droplet.present? ||
+          cached_latest_package.present? &&
+            cached_current_droplet.try(:package) != cached_latest_package &&
+            cached_latest_package.created_at >= cached_latest_droplet.created_at)
+      end
+      'PENDING'
     end
 
     def staging_task_id

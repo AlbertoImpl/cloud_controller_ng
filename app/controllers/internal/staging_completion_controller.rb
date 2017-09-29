@@ -58,7 +58,7 @@ module VCAP::CloudController
       [200, '{}']
     end
 
-    post '/internal/v3/staging/:staging_guid/build_completed', :build_completed
+    post '/internal/v3/staging/:staging_guid/build_completed', @latest_build.nil? || @latest_build.staged?
     def build_completed(staging_guid)
       staging_response = read_body
       build            = BuildModel.find(guid: staging_guid)
